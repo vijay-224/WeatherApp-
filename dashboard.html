@@ -1,0 +1,393 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Weather Dashboard</title>
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600&display=swap" rel="stylesheet"/>
+  <script src="https://www.gstatic.com/firebasejs/9.14.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.14.0/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.14.0/firebase-firestore-compat.js"></script>
+  <style>
+    :root {
+      --primary-color: #007BFF;
+      --accent-color: #00C9A7;
+      --light-bg: #ffffffcc;
+      --dark-bg: #1e1e1ecc;
+      --text-color: #333;
+      --dark-text: #eee;
+      --card-bg: #fdfdfd;
+      --card-dark-bg: #2c2c2c;
+      --hover-color: #0056b3; 
+      --input-bg: #f0f4f8;
+      --input-dark-bg: #333;
+    } 
+
+    * {
+      margin: 0; 
+      padding: 0;
+      box-sizing: border-box;
+      font-family: 'Poppins', sans-serif;
+    }
+
+    body {
+      background: linear-gradient(135deg, #8ec5fc, #e0c3fc);
+      min-height: 100vh;
+      padding: 20px;
+      color: var(--text-color);
+      transition: background 0.5s, color 0.3s;
+    }
+
+    body.dark {
+      background: linear-gradient(135deg, #141e30, #243b55);
+      color: var(--dark-text);
+    }
+
+    .navbar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      background-color: var(--light-bg);
+      backdrop-filter: blur(10px);
+      padding: 10px 20px;
+      border-radius: 10px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+      margin-bottom: 30px;
+    }
+
+    body.dark .navbar {
+      background-color: var(--dark-bg);
+    }
+
+    .greeting {
+      font-size: 18px;
+      font-weight: 600;
+    }
+
+    .toggle-theme {
+      font-size: 20px;
+      cursor: pointer;
+      background: transparent;
+      border: none;
+      color: var(--primary-color);
+    }
+
+    .profile-container {
+      position: relative;
+    }
+
+    .profile-icon {
+      background: linear-gradient(135deg, var(--primary-color), var(--accent-color));
+      color: white;
+      width: 35px;
+      height: 35px;
+      border-radius: 50%;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      cursor: pointer;
+      font-weight: bold;
+    }
+
+    .profile-card {
+      position: absolute;
+      top: 45px;
+      right: 0;
+      background-color: var(--card-bg);
+      color: black;
+      padding: 10px;
+      border-radius: 10px;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.2);
+      display: none;
+      z-index: 1;
+      width: 220px;
+    }
+
+    body.dark .profile-card {
+      background-color: var(--card-dark-bg);
+      color: white;
+    }
+
+    .profile-container:hover .profile-card {
+      display: block;
+    }
+
+    .logout-btn {
+      margin-top: 10px;
+      padding: 6px 12px;
+      background-color: #e74c3c;
+      border: none;
+      color: white;
+      border-radius: 6px;
+      cursor: pointer;
+      transition: background-color 0.3s;
+    }
+
+    .logout-btn:hover {
+      background-color: #c0392b;
+    }
+
+    .dashboard-container {
+      max-width: 600px;
+      margin: 0 auto;
+      background-color: var(--light-bg);
+      padding: 20px;
+      border-radius: 10px;
+      border: 2px solid #b0c4de;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+    }
+
+    body.dark .dashboard-container {
+      background-color: var(--dark-bg);
+      border: 2px solid #4f6d7a;
+    }
+
+    h3 {
+      margin-bottom: 15px;
+      color: var(--primary-color);
+    }
+
+    .weather-input {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      margin-bottom: 20px;
+    }
+
+    #city-input {
+      padding: 10px;
+      background-color: var(--input-bg);
+      border: 2px solid #ddd;
+      border-radius: 6px;
+      outline: none;
+    }
+
+    body.dark #city-input {
+      background-color: var(--input-dark-bg);
+      color: var(--dark-text);
+      border: 2px solid #444;
+    }
+
+    #search-btn {
+      padding: 10px;
+      background: linear-gradient(135deg, var(--primary-color), var(--accent-color));
+      color: white;
+      border: none;
+      border-radius: 6px;
+      cursor: pointer;
+      transition: background 0.3s;
+    }
+
+    #search-btn:hover {
+      background: linear-gradient(135deg, var(--hover-color), var(--accent-color));
+    }
+
+    .weather-info {
+      display: none;
+      background-color: #ffffffee;
+      color: #111;
+      padding: 15px;
+      border-radius: 10px;
+      margin-top: 10px;
+      box-shadow: 0 4px 15px rgba(0, 0, 0, 0.15);
+    }
+
+    body.dark .weather-info {
+      background-color: #2f2f2fdd;
+      color: #f5f5f5;
+    }
+
+    .autocomplete-list {
+      position: absolute;
+      background-color: white;
+      border: 1px solid #ccc;
+      max-height: 150px;
+      overflow-y: auto;
+      z-index: 10;
+      width: calc(100% - 20px);
+      border-radius: 6px;
+      display: none;
+    }
+
+    body.dark .autocomplete-list {
+      background-color: #333;
+      color: white;
+      border: 1px solid #555;
+    }
+
+    .autocomplete-list div {
+      padding: 10px;
+      cursor: pointer;
+    }
+
+    .autocomplete-list div:hover {
+      background-color: #f0f0f0;
+    }
+
+    body.dark .autocomplete-list div:hover {
+      background-color: #555;
+    }
+
+    .cloud {
+      position: absolute;
+      background: url('https://www.transparenttextures.com/patterns/cloudy.png');
+      background-size: contain;
+      width: 150px;
+      height: 100px;
+      opacity: 0.2;
+      z-index: -1;
+    }
+
+    .cloud1 { top: 20px; left: -150px; animation: cloudMove 60s linear infinite; }
+    .cloud2 { top: 80px; left: -200px; animation: cloudMove 90s linear infinite; }
+    .cloud3 { top: 140px; left: -100px; animation: cloudMove 120s linear infinite; }
+    .cloud4 { top: 200px; left: -180px; animation: cloudMove 80s linear infinite; }
+
+    @keyframes cloudMove {
+      from { transform: translateX(0); }
+      to { transform: translateX(150vw); }
+    }
+  </style>
+</head>
+<body>
+  <div class="cloud cloud1"></div>
+  <div class="cloud cloud2"></div>
+  <div class="cloud cloud3"></div>
+  <div class="cloud cloud4"></div>
+
+  <nav class="navbar">
+    <p class="greeting">Hello, <span id="user-name">User</span>👋</p>
+    <button class="toggle-theme" id="theme-toggle">🌙</button>
+    <div class="profile-container">
+      <div class="profile-icon" id="profile-icon">U</div>
+      <div class="profile-card">
+        <p><strong>Email:</strong> <span id="user-email"></span></p>
+        <p><strong>Username:</strong> <span id="user-username"></span></p>
+        <p><strong>Phone:</strong> <span id="user-phone"></span></p>
+        <p><strong>Address:</strong> <span id="user-address"></span></p>
+        <button class="logout-btn" id="logout-btn">Logout</button>
+      </div>
+    </div>
+  </nav>
+
+  <div class="dashboard-container">
+    <h3>Check Weather</h3>
+    <div class="weather-input">
+      <input type="text" id="city-input" placeholder="Enter city name" autocomplete="off" />
+      <div id="city-suggestions" class="autocomplete-list"></div>
+      <button id="search-btn">Search</button>
+    </div>
+    <div class="weather-info" id="weather-info">
+      <h3 id="weather-city"></h3>
+      <p><strong>Temperature:</strong> <span id="temp"></span>°C</p>
+      <p><strong>Humidity:</strong> <span id="humidity"></span>%</p>
+      <p><strong>Wind Speed:</strong> <span id="wind-speed"></span> m/s</p>
+      <p><strong>Weather:</strong> <span id="weather-desc"></span></p>
+    </div>
+  </div>
+
+  <script>
+    const firebaseConfig = {
+      apiKey: "AIzaSyCsr7LLgKHLx_eJsRZVrTE2xBJ-qG3Sl4Q",
+      authDomain: "project-606e4.firebaseapp.com",
+      projectId: "project-606e4",
+      storageBucket: "project-606e4.appspot.com",
+      messagingSenderId: "247449520566",
+      appId: "1:247449520566:web:5ae6e0f33dc4eb4f2e1917"
+    };
+
+    firebase.initializeApp(firebaseConfig);
+    const auth = firebase.auth();
+    const db = firebase.firestore();
+    const weatherApiKey = "2b44b1cf559f2de8d4d889f0a8e7bd29";
+
+    auth.onAuthStateChanged((user) => {
+      if (user) {
+        db.collection("users").doc(user.uid).get().then((doc) => {
+          if (doc.exists) {
+            const userData = doc.data();
+            document.getElementById("user-name").innerText = userData.fullName;
+            document.getElementById("profile-icon").innerText = userData.fullName.charAt(0).toUpperCase();
+            document.getElementById("user-email").innerText = userData.email;
+            document.getElementById("user-username").innerText = userData.username;
+            document.getElementById("user-phone").innerText = userData.phone;
+            document.getElementById("user-address").innerText = userData.address;
+          }
+        });
+      } else {
+        window.location.href = "login.html";
+      }
+    });
+
+    function getWeather(city) {
+      fetch(`https://api.openweathermap.org/data/2.5/weather?q=${city}&appid=${weatherApiKey}&units=metric`)
+        .then(response => {
+          if (!response.ok) throw new Error("City not found");
+          return response.json();
+        })
+        .then(data => {
+          document.getElementById("weather-city").innerText = data.name;
+          document.getElementById("temp").innerText = data.main.temp;
+          document.getElementById("humidity").innerText = data.main.humidity;
+          document.getElementById("wind-speed").innerText = data.wind.speed;
+          document.getElementById("weather-desc").innerText = data.weather[0].description;
+          document.getElementById("weather-info").style.display = "block";
+        })
+        .catch(err => {
+          alert("Error: " + err.message);
+          document.getElementById("weather-info").style.display = "none";
+        });
+    }
+
+    document.getElementById("search-btn").addEventListener("click", () => {
+      const city = document.getElementById("city-input").value.trim();
+      if (city) getWeather(city);
+    });
+
+    document.getElementById("logout-btn").addEventListener("click", () => {
+      auth.signOut().then(() => {
+        window.location.href = "login.html";
+      });
+    });
+
+    const toggleTheme = document.getElementById("theme-toggle");
+    const rootBody = document.body;
+
+    toggleTheme.addEventListener("click", () => {
+      rootBody.classList.toggle("dark");
+      localStorage.setItem("theme", rootBody.classList.contains("dark") ? "dark" : "light");
+      toggleTheme.innerText = rootBody.classList.contains("dark") ? "☀️" : "🌙";
+    });
+
+    if (localStorage.getItem("theme") === "dark") {
+      rootBody.classList.add("dark");
+      toggleTheme.innerText = "☀️";
+    }
+
+    const cityList = ["New York", "London", "Paris", "Mumbai", "Tokyo", "Delhi", "Berlin", "Sydney", "Toronto", "Moscow"];
+    const input = document.getElementById("city-input");
+    const suggestionBox = document.getElementById("city-suggestions");
+
+    input.addEventListener("input", () => {
+      const query = input.value.toLowerCase();
+      suggestionBox.innerHTML = "";
+      if (query.length === 0) {
+        suggestionBox.style.display = "none";
+        return;
+      }
+      const matches = cityList.filter(city => city.toLowerCase().startsWith(query));
+      matches.forEach(city => {
+        const div = document.createElement("div");
+        div.innerText = city;
+        div.addEventListener("click", () => {
+          input.value = city;
+          suggestionBox.innerHTML = "";
+          suggestionBox.style.display = "none";
+        });
+        suggestionBox.appendChild(div);
+      });
+      suggestionBox.style.display = matches.length > 0 ? "block" : "none";
+    });
+  </script>
+</body>
+</html>
